@@ -1,0 +1,123 @@
+using Balanceador.Contratos;
+using Balanceador.Interfaces;
+using Balanceador.Modelos;
+
+namespace Balanceador.Testes.Fakes;
+
+internal sealed class PlacaFalsa(string id) : IPlaca
+{
+    public string Id => id;
+    public bool Offline { get; set; }
+    public bool IgnorarCancelamento { get; set; }
+    public bool PerderAceitacao { get; set; }
+    public bool FalharImagem { get; set; }
+    public bool CpuValida { get; set; } = true;
+    public bool CorPorPassagem { get; set; }
+    public int QuantidadeVagas { get; set; } = 2;
+    public int Versao { get; set; } = 4;
+    public int Envios { get; private set; }
+    public long IdadeAmostra { get; set; }
+    public double[] Cpu { get; set; } = [0, 0];
+    public Dictionary<int, ResultadoTrabalho> Resultados { get; } = [];
+
+    private void Verificar()
+    {
+        if (Offline)
+        {
+            throw new IOException("Offline.");
+        }
+    }
+
+    public Task<SaudePlaca> ConsultarSaude(CancellationToken cancelamento)
+    {
+        Verificar();
+        var nucleos = Enumerable.Range(0, 2).Select(nucleo =>
+        {
+            var resultado = Resultados.Values.FirstOrDefault(r => r.Nucleo == nucleo && r.Estado == EstadosTrabalho.Executando);
+            return new SaudeNucleo(nucleo, resultado is not null, resultado?.Id, resultado?.Progresso ?? 0, Cpu[nucleo]);
+        }).ToArray();
+
+        var vagas = Enumerable.Range(0, QuantidadeVagas).Select(indice =>
+        {
+            var resultado = Resultados.GetValueOrDefault(indice);
+            return new SaudeVaga(indice, resultado?.Estado == EstadosTrabalho.Executando, resultado?.Id, resultado?.Progresso ?? 0);
+        }).ToArray();
+
+        return Task.FromResult(new SaudePlaca(Versao, id, Cpu.Average(), CpuValida, IdadeAmostra, nucleos, 0, 0, 200000, -45, vagas));
+    }
+
+    public Task<ResultadoTrabalho> Enviar(string identificador, SolicitacaoTrabalho solicitacao, int nucleo, CancellationToken cancelamento)
+    {
+        Verificar();
+        Envios++;
+        var perfil = PerfilRenderizacao.Obter(solicitacao.Nivel);
+        if (Resultados.GetValueOrDefault(nucleo)?.Estado == EstadosTrabalho.Executando)
+        {
+            throw new InvalidOperationException("Ocupado.");
+        }
+
+        var resultado = new ResultadoTrabalho(
+            identificador,
+            EstadosTrabalho.Executando,
+            perfil.Nivel,
+            nucleo % 2,
+            0,
+            16,
+            16,
+            0,
+            solicitacao.Quadro,
+            solicitacao.Passagem,
+            solicitacao.Coluna,
+            solicitacao.Linha,
+            solicitacao.LarguraImagem,
+            solicitacao.AlturaImagem,
+            solicitacao.Tipo,
+            solicitacao.DuracaoSegundos,
+            nucleo);
+
+        Resultados[nucleo] = resultado;
+        if (PerderAceitacao)
+        {
+            throw new IOException("Resposta perdida.");
+        }
+
+        return Task.FromResult(resultado);
+    }
+
+    public Task<ResultadoTrabalho> ConsultarTrabalho(string identificador, CancellationToken cancelamento)
+    {
+        Verificar();
+        return Task.FromResult(Resultados.Values.Single(resultado => resultado.Id == identificador));
+    }
+
+    public Task<byte[]> ObterImagem(string identificador, int tamanho, CancellationToken cancelamento)
+    {
+        if (FalharImagem)
+        {
+            throw new IOException("Transferência interrompida.");
+        }
+
+        byte cor = CorPorPassagem
+            ? (byte)((Resultados.Values.Single(resultado => resultado.Id == identificador).Passagem + 1) * 40)
+            : (byte)0;
+
+        return Task.FromResult(Enumerable.Repeat(cor, tamanho).ToArray());
+    }
+
+    public Task Cancelar(string identificador, CancellationToken cancelamento)
+    {
+        Verificar();
+        foreach (var (nucleo, resultado) in Resultados.ToArray())
+        {
+            if (resultado.Id == identificador && !IgnorarCancelamento)
+            {
+                Resultados[nucleo] = resultado with { Estado = EstadosTrabalho.Cancelado };
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public void Concluir(int nucleo) =>
+        Resultados[nucleo] = Resultados[nucleo] with { Estado = EstadosTrabalho.Concluido, Progresso = 100, TempoMs = 100 };
+}

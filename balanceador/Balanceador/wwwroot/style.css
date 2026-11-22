@@ -1,0 +1,73 @@
+:root {
+  color-scheme: dark;
+  --fundo: #111719;
+  --painel: #1a2326;
+  --borda: #344347;
+  --texto: #eff4f0;
+  --suave: #a7b7b3;
+  --destaque: #c3ed84;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px/1.5 system-ui, sans-serif; }
+main { max-width: 1020px; margin: auto; padding: 40px 24px; }
+header { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 28px; }
+h1 { margin: 4px 0 8px; font-size: clamp(26px, 4vw, 38px); letter-spacing: -1px; }
+h2 { margin: 0; font-size: 19px; }
+h3 { margin: 24px 0 12px; font-size: 14px; font-weight: 500; color: var(--suave); }
+p { margin: 8px 0; color: var(--suave); }
+.sobretitulo { color: var(--destaque); font-size: 11px; letter-spacing: 1.6px; }
+.conexao { display: grid; gap: 5px; font-size: 12px; text-align: right; white-space: nowrap; color: var(--suave); }
+#conexao { color: var(--destaque); }
+.adicionar, .placa, .fila, .decisao { background: var(--painel); border: 1px solid var(--borda); border-radius: 12px; padding: 24px; }
+.adicionar { margin-bottom: 22px; }
+.adicionar p { font-size: 14px; }
+.botoes-tarefas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px; }
+button { cursor: pointer; border: 1px solid transparent; border-radius: 7px; padding: 13px 18px; font: 600 15px system-ui, sans-serif; }
+button.leve, .nivel.leve { background: #283d30; color: #bceca4; border-color: #52724c; }
+button.medio, .nivel.medio { background: #403b25; color: #f2df8c; border-color: #796e3c; }
+button.pesado, .nivel.pesado { background: #44302b; color: #ffc19d; border-color: #865b45; }
+button:hover { filter: brightness(1.12); }
+button:disabled { opacity: .5; cursor: wait; }
+.placas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.titulo-secao { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.situacao, #quantidade-fila { color: var(--suave); font-size: 12px; }
+.leitura-cpu { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 10px; color: var(--suave); font-size: 14px; }
+.leitura-cpu strong { color: var(--texto); font-size: 34px; font-weight: 500; }
+progress { display: block; width: 100%; height: 12px; overflow: hidden; border: 0; border-radius: 8px; background: #344347; accent-color: var(--destaque); }
+progress::-webkit-progress-bar { background: #344347; }
+progress::-webkit-progress-value { background: var(--destaque); }
+progress::-moz-progress-bar { background: var(--destaque); }
+progress.cpu-alta { accent-color: #ffc19d; }
+progress.cpu-alta::-webkit-progress-value { background: #ffc19d; }
+progress.cpu-alta::-moz-progress-bar { background: #ffc19d; }
+.tarefas, .tarefas-fila { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.tarefas { min-height: 112px; align-content: start; }
+.tarefa { display: flex; gap: 12px; align-items: center; font-size: 14px; }
+.numero { color: var(--suave); min-width: 32px; font: 13px ui-monospace, monospace; }
+.nivel { border: 1px solid; border-radius: 5px; padding: 3px 12px; min-width: 84px; text-align: center; font-size: 13px; }
+.tempo { margin-left: auto; color: var(--suave); font-size: 12px; }
+.secundario { width: 100%; margin-top: 22px; color: var(--texto); border-color: var(--borda); background: #253034; font-size: 13px; }
+.fila, .decisao { margin-top: 22px; }
+.imagem { margin-top: 40px; padding: 24px; border: 1px solid var(--borda); border-radius: 12px; background: var(--painel); }
+.imagem canvas { display: block; width: 100%; height: auto; margin: 20px 0 14px; border-radius: 8px; background: #080c10; }
+.imagem progress { margin-top: 10px; height: 8px; }
+.resetar { color: var(--texto); background: #253034; border-color: var(--borda); font-size: 13px; white-space: nowrap; }
+.fila p { font-size: 14px; }
+.tarefas-fila { margin-top: 15px; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); }
+.decisao { border-left: 3px solid var(--destaque); }
+#ultima-decisao { color: var(--texto); font-size: 15px; }
+.muted { color: var(--suave); font-size: 14px; }
+.erro, .aviso { color: #ffc19d; font-size: 13px; }
+.mensagem { color: var(--destaque); font-size: 14px; }
+footer { padding-top: 26px; font-size: 12px; line-height: 1.8; color: var(--suave); }
+:focus-visible { outline: 2px solid var(--destaque); outline-offset: 4px; }
+@media (max-width: 650px) {
+  main { padding: 24px 16px; }
+  header { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .conexao { text-align: left; }
+  .placas { grid-template-columns: 1fr; }
+  .adicionar, .placa, .fila, .decisao { padding: 20px; }
+  .botoes-tarefas { gap: 8px; }
+  .imagem { padding: 20px; }
+  .imagem > .titulo-secao:first-child { flex-direction: column; align-items: flex-start; }
+}

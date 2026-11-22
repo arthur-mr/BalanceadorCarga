@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Distribuição de carga · ESP32</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div><p class="sobretitulo">DOIS ESP32 · UM BALANCEADOR</p><h1>Distribuição de carga</h1><p>Adicione tarefas e observe qual placa recebe cada uma.</p></div>
+      <div class="conexao"><span id="modo">Carregando…</span><span id="conexao" role="status">Conectando…</span></div>
+    </header>
+    <section class="adicionar" aria-labelledby="titulo-tarefas">
+      <div><h2 id="titulo-tarefas">Adicionar uma tarefa</h2><p>Todas duram cerca de 20 segundos. O nível muda o esforço de processamento.</p></div>
+      <div class="botoes-tarefas">
+        <button id="adicionar-leve" class="leve">Leve</button>
+        <button id="adicionar-medio" class="medio">Média</button>
+        <button id="adicionar-pesado" class="pesado">Pesada</button>
+      </div>
+    </section>
+    <section id="placas" class="placas" aria-label="Placas ESP32"></section>
+    <section class="fila" aria-labelledby="titulo-fila">
+      <div class="titulo-secao"><h2 id="titulo-fila">Fila de espera</h2><span id="quantidade-fila">0 tarefas</span></div>
+      <p id="situacao-fila" class="muted">Nenhuma tarefa aguardando.</p>
+      <ol id="tarefas-fila" class="tarefas-fila"></ol>
+    </section>
+    <section class="decisao" aria-labelledby="titulo-decisao">
+      <h2 id="titulo-decisao">Última decisão</h2>
+      <p id="ultima-decisao" role="status">Adicione uma tarefa para acompanhar a escolha.</p>
+    </section>
+    <p id="aviso" class="aviso" role="status" hidden></p>
+    <p id="mensagem" class="mensagem" role="status" hidden></p>
+    <section class="imagem" aria-labelledby="titulo-imagem">
+      <div class="titulo-secao"><h2 id="titulo-imagem">Imagem criada pelos processadores</h2><button id="resetar-imagem" class="resetar">Resetar imagem</button></div>
+      <p class="muted">A imagem é preenchida e refinada com os blocos calculados nas tarefas acima.</p>
+      <canvas id="imagem-processada" width="512" height="384" role="img" aria-label="Cena 3D calculada progressivamente pelos ESP32"></canvas>
+      <div class="titulo-secao"><span class="muted">512 × 384 pixels</span><span id="progresso-imagem" class="muted">0% concluída</span></div>
+      <progress id="barra-imagem" max="3072" value="0" aria-label="Progresso da imagem"></progress>
+      <p id="aviso-imagem" class="aviso" role="status" hidden></p>
+    </section>
+    <footer>O balanceador escolhe a placa com menor carga de CPU disponível.<br>Retire uma placa para observar as tarefas seguindo para a outra.</footer>
+  </main>
+</body>
+</html>
