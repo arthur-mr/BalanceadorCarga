@@ -23,9 +23,7 @@ Todas as tarefas duram aproximadamente 20 segundos. O nível altera o esforço d
 
 ---
 
-## 1. Configurar e gravar o firmware nos ESP32 (v5)
-
-> **Importante:** Para acompanhar a imagem compartilhada, grave as duas placas com o **firmware v5**, reinicie o balanceador e atualize a página. Placas com firmware v4 ainda executam tarefas, mas não enviam blocos para a imagem.
+## 1. Configurar e gravar o firmware nos ESP32
 
 1. Pare o balanceador caso esteja rodando.
 2. Na pasta `firmware/esp32`, crie o arquivo local de configuração (ignorado pelo Git) a partir do exemplo:
@@ -53,7 +51,7 @@ pio device monitor --port COM3 -b 115200
 
 ### Funcionamento do firmware
 
-- **Arduino + ESP-IDF:** o projeto em `firmware/esp32` compila Arduino 2.0.17 como componente ESP-IDF 4.4.7 sobre FreeRTOS com estatísticas de tempo ocioso habilitadas (`sdkconfig.defaults`) para medir a CPU por núcleo a cada segundo.
+- **Arduino + ESP-IDF:** o projeto em `firmware/esp32` compila o framework Arduino como componente ESP-IDF sobre FreeRTOS com estatísticas de tempo ocioso habilitadas (`sdkconfig.defaults`) para medir a CPU por núcleo a cada segundo.
 - **Vagas e núcleos:** há 4 vagas lógicas (índices `0` a `3`) mapeadas aos 2 núcleos físicos por `vaga % 2`.
 - **Buffers e proteção:** cada vaga aceita um trabalho por vez, usa buffers RGB de 768 bytes (cálculo e publicação), possui timeout local de 300 segundos e acende o LED interno (pino `2`) enquanto houver alguma vaga ocupada.
 
@@ -102,7 +100,7 @@ Abra **http://127.0.0.1:5080** no navegador.
 ### Como funciona a imagem compartilhada
 
 - As tarefas dos três botões executam ray tracing repetidamente em blocos de 16 × 16 pixels de uma cena 3D (esferas, sombras e piso quadriculado).
-- No firmware v5, cada tarefa publica blocos concluídos e recebe a próxima posição da imagem enquanto continua executando durante os 20 segundos.
+- Cada tarefa publica blocos concluídos e recebe a próxima posição da imagem enquanto continua executando durante os 20 segundos.
 - A imagem de 512 × 384 pixels é preenchida do centro para as bordas em 4 passagens de refinamento (**3.072 blocos** no total). Sem tarefas em execução, a imagem pausa.
 - **Resetar imagem** limpa os pixels e inicia uma nova sessão de imagem sem cancelar as tarefas em andamento nem alterar a distribuição por CPU.
 
@@ -123,7 +121,7 @@ Tarefas interrompidas por retirada ou falha voltam para a fila com o **mesmo nú
 
 ## 4. API principal
 
-- `GET /api/info`: modo ativo, protocolo (`5`), identificação do painel (`"simples"`), `imagemProgressiva` e duração das tarefas (`20` s).
+- `GET /api/info`: modo ativo, versão do protocolo, identificação do painel (`"simples"`), `imagemProgressiva` e duração das tarefas (`20` s).
 - `POST /api/tasks`: JSON `{"nivel":"leve"}` (`leve`, `medio` ou `pesado`); retorna `202` com `numero`. Destino e duração são definidos no servidor.
 - `GET /api/painel/state`: estado resumido com placas, fila, última decisão, situação, aviso e progresso da imagem.
 - `GET /api/painel/events`: envia o mesmo estado via SSE (1 vez por segundo).
@@ -170,4 +168,4 @@ Invoke-WebRequest "$placa/jobs/$id/image" -OutFile bloco.rgb
 Invoke-RestMethod "$placa/cancel" -Method Post -Body @{ id=$id }
 ```
 
-O arquivo `bloco.rgb` contém 768 bytes RGB sem cabeçalho. Para testar uma carga contínua, envie `tipo='carga'` e `duracaoSegundos=30` (na v5, consulte blocos intermediários com `GET /jobs/{id}/tile` e confirme/avance com `POST /jobs/{id}/next`).
+O arquivo `bloco.rgb` contém 768 bytes RGB sem cabeçalho. Para testar uma carga contínua, envie `tipo='carga'` e `duracaoSegundos=30` (consulte blocos intermediários com `GET /jobs/{id}/tile` e confirme/avance com `POST /jobs/{id}/next`).
