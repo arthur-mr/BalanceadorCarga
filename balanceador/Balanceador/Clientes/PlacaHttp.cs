@@ -36,7 +36,6 @@ public sealed class PlacaHttp(string id, HttpClient cliente) : IPlaca
             ["linha"] = TextoInvariante(solicitacao.Linha),
             ["larguraImagem"] = TextoInvariante(solicitacao.LarguraImagem),
             ["alturaImagem"] = TextoInvariante(solicitacao.AlturaImagem),
-            ["tipo"] = solicitacao.Tipo,
             ["duracaoSegundos"] = TextoInvariante(solicitacao.DuracaoSegundos)
         });
 
@@ -50,35 +49,6 @@ public sealed class PlacaHttp(string id, HttpClient cliente) : IPlaca
     public async Task<ResultadoTrabalho> ConsultarTrabalho(string identificador, CancellationToken cancelamento) =>
         await cliente.GetFromJsonAsync<ResultadoTrabalho>($"jobs?id={Uri.EscapeDataString(identificador)}", cancelamento)
         ?? throw new IOException("Resultado vazio.");
-
-    public async Task<byte[]> ObterImagem(string identificador, int tamanho, CancellationToken cancelamento)
-    {
-        using var limite = CriarTimeoutLeitura(cancelamento);
-        using var resposta = await cliente.GetAsync(
-            $"jobs/{Uri.EscapeDataString(identificador)}/image",
-            HttpCompletionOption.ResponseHeadersRead,
-            limite.Token);
-
-        resposta.EnsureSuccessStatusCode();
-
-        long? tamanhoDeclarado = resposta.Content.Headers.ContentLength;
-        if (tamanho != SolicitacaoTrabalho.BytesBloco || (tamanhoDeclarado.HasValue && tamanhoDeclarado.Value != tamanho))
-        {
-            throw new IOException("Tamanho de imagem inválido.");
-        }
-
-        using var fluxo = await resposta.Content.ReadAsStreamAsync(limite.Token);
-        var imagem = new byte[tamanho];
-        await fluxo.ReadExactlyAsync(imagem, limite.Token);
-
-        var byteExcedente = new byte[1];
-        if (await fluxo.ReadAsync(byteExcedente, limite.Token) != 0)
-        {
-            throw new IOException("Imagem excede o tamanho esperado.");
-        }
-
-        return imagem;
-    }
 
     public async Task Cancelar(string identificador, CancellationToken cancelamento)
     {

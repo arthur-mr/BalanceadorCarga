@@ -27,7 +27,6 @@ struct Trabalho {
   char id[33] = {};
   uint8_t perfil = 0;
   BlocoCena bloco;
-  bool carga = false;
   uint16_t duracaoSegundos = 0;
 };
 
@@ -37,7 +36,6 @@ struct EstadoVaga {
   bool ocupado = false;
   bool cancelar = false;
   Situacao situacao = Situacao::Executando;
-  uint32_t pixelsConcluidos = 0;
   uint32_t inicioMs = 0;
   uint32_t tempoMs = 0;
   BlocoCena blocoAtual;
@@ -61,6 +59,13 @@ EstadoVaga consultarEstado(uint8_t vaga) {
   return estado;
 }
 
+bool trabalhoCancelado(uint8_t vaga) {
+  portENTER_CRITICAL(&travaEstados);
+  const bool cancelado = estados[vaga].cancelar;
+  portEXIT_CRITICAL(&travaEstados);
+  return cancelado;
+}
+
 const char* nomeSituacao(Situacao situacao) {
   switch (situacao) {
     case Situacao::Concluido: return "concluido";
@@ -71,18 +76,14 @@ const char* nomeSituacao(Situacao situacao) {
 }
 
 float calcularProgresso(const EstadoVaga& estado) {
-  if (estado.trabalho.carga) {
-    if (estado.situacao == Situacao::Concluido) {
-      return 100.0f;
-    }
-
-    const uint32_t tempo = estado.ocupado ? millis() - estado.inicioMs : estado.tempoMs;
-    return estado.trabalho.duracaoSegundos
-      ? min(100.0f, tempo / (estado.trabalho.duracaoSegundos * 10.0f))
-      : 0.0f;
+  if (estado.situacao == Situacao::Concluido) {
+    return 100.0f;
   }
 
-  return 100.0f * estado.pixelsConcluidos / (tamanhoBloco * tamanhoBloco);
+  const uint32_t tempo = estado.ocupado ? millis() - estado.inicioMs : estado.tempoMs;
+  return estado.trabalho.duracaoSegundos
+    ? min(100.0f, tempo / (estado.trabalho.duracaoSegundos * 10.0f))
+    : 0.0f;
 }
 
 void responderErro(int codigo, const char* mensagem) {
@@ -125,7 +126,7 @@ void responderResultado(int codigo, uint8_t vaga) {
     "{\"id\":\"%s\",\"estado\":\"%s\",\"nivel\":\"%s\",\"nucleo\":%u,\"vaga\":%u,"
     "\"progresso\":%.2f,\"largura\":16,\"altura\":16,\"tempoMs\":%lu,"
     "\"quadro\":%lu,\"passagem\":%u,\"coluna\":%u,\"linha\":%u,"
-    "\"larguraImagem\":%u,\"alturaImagem\":%u,\"tipo\":\"%s\",\"duracaoSegundos\":%u}",
+    "\"larguraImagem\":%u,\"alturaImagem\":%u,\"duracaoSegundos\":%u}",
     trabalho.id,
     nomeSituacao(estado.situacao),
     perfis[trabalho.perfil].nivel,
@@ -139,7 +140,6 @@ void responderResultado(int codigo, uint8_t vaga) {
     bloco.linha,
     bloco.largura,
     bloco.altura,
-    trabalho.carga ? "carga" : "bloco",
     trabalho.duracaoSegundos);
 
   servidor.send(codigo, "application/json", resposta);
@@ -160,12 +160,11 @@ void descansarSeOrcamentoEsgotado(uint32_t& inicioJanela, uint32_t orcamentoUs) 
 
 void publicarBlocoSePronto(
     uint8_t vaga,
-    const Trabalho& trabalho,
     const EstadoVaga& estadoInicial,
     uint32_t pixels,
     bool cancelado,
     bool expirou) {
-  if (!trabalho.carga || cancelado || expirou || pixels != tamanhoBloco * tamanhoBloco) {
+  if (cancelado || expirou || pixels != tamanhoBloco * tamanhoBloco) {
     return;
   }
 
@@ -197,14 +196,14 @@ void executarTrabalhos(void* parametro) {
       const EstadoVaga atual = consultarEstado(vaga);
       uint32_t pixels = 0;
 
-      for (uint16_t linha = 0; linha < tamanhoBloco && !cancelado && !expirou; ++linha) {
-        for (uint16_t coluna = 0; coluna < tamanhoBloco; ++coluna) {
-          cancelado = consultarEstado(vaga).cancelar;
-          expirou = millis() - inicio >= timeoutMaximoTrabalhoMs;
-          if (cancelado || expirou) {
-            break;
-          }
+      for (uint16_t linha = 0; linha < tamanhoBloco; ++linha) {
+        cancelado = trabalhoCancelado(vaga);
+        expirou = millis() - inicio >= timeoutMaximoTrabalhoMs;
+        if (cancelado || expirou) {
+          break;
+        }
 
+        for (uint16_t coluna = 0; coluna < tamanhoBloco; ++coluna) {
           const Vetor cor = calcularPixel(
             atual.blocoAtual.coluna + coluna,
             atual.blocoAtual.linha + linha,
@@ -219,14 +218,10 @@ void executarTrabalhos(void* parametro) {
 
           descansarSeOrcamentoEsgotado(inicioJanela, orcamentoUs);
         }
-
-        portENTER_CRITICAL(&travaEstados);
-        estados[vaga].pixelsConcluidos = pixels;
-        portEXIT_CRITICAL(&travaEstados);
       }
 
-      publicarBlocoSePronto(vaga, trabalho, atual, pixels, cancelado, expirou);
-    } while (trabalho.carga && !cancelado && !expirou && millis() - inicio < trabalho.duracaoSegundos * 1000UL);
+      publicarBlocoSePronto(vaga, atual, pixels, cancelado, expirou);
+    } while (!cancelado && !expirou && millis() - inicio < trabalho.duracaoSegundos * 1000UL);
 
     portENTER_CRITICAL(&travaEstados);
     cancelado = cancelado || estados[vaga].cancelar;
@@ -272,7 +267,7 @@ void responderSaude() {
   snprintf(
     trecho,
     sizeof(trecho),
-    "{\"versao\":5,\"no\":\"%s\",\"cpuTotal\":%.2f,\"cpuValida\":%s,\"idadeAmostraMs\":%lu,\"nucleos\":[",
+    "{\"no\":\"%s\",\"cpuTotal\":%.2f,\"cpuValida\":%s,\"idadeAmostraMs\":%lu,\"nucleos\":[",
     escaparJson(NODE_NAME).c_str(),
     (cpu.nucleos[0] + cpu.nucleos[1]) / 2.0f,
     cpu.valida ? "true" : "false",
@@ -362,7 +357,6 @@ int buscarIndicePerfil(const String& nivel) {
 bool lerTrabalhoDaRequisicao(Trabalho& trabalho, uint32_t& vaga, const char*& mensagemErro) {
   const String identificador = servidor.arg("id");
   const String nivel = servidor.arg("nivel");
-  const String tipo = servidor.arg("tipo");
 
   uint32_t quadro = 0;
   uint32_t passagem = 0;
@@ -383,13 +377,8 @@ bool lerTrabalhoDaRequisicao(Trabalho& trabalho, uint32_t& vaga, const char*& me
       !lerNumero("linha", altura - tamanhoBloco, linha) ||
       coluna % tamanhoBloco != 0 ||
       linha % tamanhoBloco != 0 ||
-      !lerNumero("duracaoSegundos", duracaoMaximaSegundos, duracao)) {
-    mensagemErro = "Parametros invalidos.";
-    return false;
-  }
-
-  const bool tipoValido = (tipo == "bloco" && duracao == 0) || (tipo == "carga" && duracao > 0);
-  if (!tipoValido) {
+      !lerNumero("duracaoSegundos", duracaoMaximaSegundos, duracao) ||
+      duracao == 0) {
     mensagemErro = "Parametros invalidos.";
     return false;
   }
@@ -408,14 +397,12 @@ bool lerTrabalhoDaRequisicao(Trabalho& trabalho, uint32_t& vaga, const char*& me
   trabalho.bloco.linha = static_cast<uint16_t>(linha);
   trabalho.bloco.largura = static_cast<uint16_t>(largura);
   trabalho.bloco.altura = static_cast<uint16_t>(altura);
-  trabalho.carga = (tipo == "carga");
   trabalho.duracaoSegundos = static_cast<uint16_t>(duracao);
   return true;
 }
 
 bool mesmosParametros(const Trabalho& primeiro, const Trabalho& segundo) {
   return primeiro.perfil == segundo.perfil &&
-    primeiro.carga == segundo.carga &&
     primeiro.duracaoSegundos == segundo.duracaoSegundos &&
     primeiro.bloco.quadro == segundo.bloco.quadro &&
     primeiro.bloco.passagem == segundo.bloco.passagem &&
@@ -478,7 +465,7 @@ void consultarPublicacao() {
     return;
   }
 
-  uint8_t dados[tamanhoMaximoImagem];
+  static uint8_t dados[tamanhoMaximoImagem];
   EstadoVaga estado;
 
   portENTER_CRITICAL(&travaEstados);
@@ -548,7 +535,6 @@ void avancarPublicacao() {
   bool aceito = false;
   portENTER_CRITICAL(&travaEstados);
   if (estados[vaga].ocupado &&
-      estados[vaga].trabalho.carga &&
       estados[vaga].imagemPronta &&
       estados[vaga].publicacao == publicacao) {
     estados[vaga].blocoAtual.quadro = quadro;
@@ -597,24 +583,6 @@ void configurarServidor() {
     portEXIT_CRITICAL(&travaEstados);
 
     servidor.send(202, "application/json", "{\"aceito\":true}");
-  });
-
-  servidor.on(UriBraces("/jobs/{}/image"), HTTP_GET, [] {
-    const int vaga = localizarTrabalho(servidor.pathArg(0));
-    if (vaga < 0) {
-      responderErro(404, "Trabalho desconhecido.");
-      return;
-    }
-
-    const EstadoVaga estado = consultarEstado(static_cast<uint8_t>(vaga));
-    if (estado.situacao != Situacao::Concluido || estado.trabalho.carga) {
-      responderErro(409, "Imagem indisponivel.");
-      return;
-    }
-
-    servidor.setContentLength(tamanhoMaximoImagem);
-    servidor.send(200, "application/octet-stream", "");
-    servidor.sendContent(reinterpret_cast<const char*>(imagens[vaga]), tamanhoMaximoImagem);
   });
 
   servidor.onNotFound([] { responderErro(404, "Endpoint desconhecido."); });

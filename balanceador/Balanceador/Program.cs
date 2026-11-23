@@ -10,7 +10,6 @@ aplicacao.UseDefaultFiles();
 aplicacao.UseStaticFiles();
 
 aplicacao.MapearEndpointsPainel(modo);
-aplicacao.MapearEndpointsCompatibilidade();
 
 if (modo == "Simulator")
 {

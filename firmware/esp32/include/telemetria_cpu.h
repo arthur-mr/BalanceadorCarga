@@ -14,10 +14,10 @@ struct TelemetriaCpu {
   uint32_t idadeAmostraMs = 0;
 };
 
-portMUX_TYPE travaCpu = portMUX_INITIALIZER_UNLOCKED;
-float cpuPorNucleo[2] = {};
-uint32_t amostraPorNucleo[2] = {};
-bool amostraValida[2] = {};
+static portMUX_TYPE travaCpu = portMUX_INITIALIZER_UNLOCKED;
+static float cpuPorNucleo[2] = {};
+static uint32_t amostraPorNucleo[2] = {};
+static bool amostraValida[2] = {};
 
 inline void medirCpu(void* parametro) {
   const uint32_t nucleo = reinterpret_cast<uintptr_t>(parametro);

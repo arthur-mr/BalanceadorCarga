@@ -21,9 +21,6 @@ internal sealed class PlacaSimulada : IPlaca
     public Task<ResultadoTrabalho> ConsultarTrabalho(string id, CancellationToken cancelamento) =>
         Task.FromResult(Simulador.ConsultarTrabalho(id));
 
-    public Task<byte[]> ObterImagem(string id, int tamanho, CancellationToken cancelamento) =>
-        Task.FromResult(Simulador.ObterImagem(id));
-
     public Task Cancelar(string id, CancellationToken cancelamento)
     {
         Simulador.Cancelar(id);

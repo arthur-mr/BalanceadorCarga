@@ -10,11 +10,8 @@ internal sealed class PlacaFalsa(string id) : IPlaca
     public bool Offline { get; set; }
     public bool IgnorarCancelamento { get; set; }
     public bool PerderAceitacao { get; set; }
-    public bool FalharImagem { get; set; }
     public bool CpuValida { get; set; } = true;
-    public bool CorPorPassagem { get; set; }
-    public int QuantidadeVagas { get; set; } = 2;
-    public int Versao { get; set; } = 4;
+    public int QuantidadeVagas { get; set; } = 4;
     public int Envios { get; private set; }
     public long IdadeAmostra { get; set; }
     public double[] Cpu { get; set; } = [0, 0];
@@ -43,15 +40,15 @@ internal sealed class PlacaFalsa(string id) : IPlaca
             return new SaudeVaga(indice, resultado?.Estado == EstadosTrabalho.Executando, resultado?.Id, resultado?.Progresso ?? 0);
         }).ToArray();
 
-        return Task.FromResult(new SaudePlaca(Versao, id, Cpu.Average(), CpuValida, IdadeAmostra, nucleos, 0, 0, 200000, -45, vagas));
+        return Task.FromResult(new SaudePlaca(id, Cpu.Average(), CpuValida, IdadeAmostra, nucleos, vagas, 0, 0, 200000, -45));
     }
 
-    public Task<ResultadoTrabalho> Enviar(string identificador, SolicitacaoTrabalho solicitacao, int nucleo, CancellationToken cancelamento)
+    public Task<ResultadoTrabalho> Enviar(string identificador, SolicitacaoTrabalho solicitacao, int vaga, CancellationToken cancelamento)
     {
         Verificar();
         Envios++;
         var perfil = PerfilRenderizacao.Obter(solicitacao.Nivel);
-        if (Resultados.GetValueOrDefault(nucleo)?.Estado == EstadosTrabalho.Executando)
+        if (Resultados.GetValueOrDefault(vaga)?.Estado == EstadosTrabalho.Executando)
         {
             throw new InvalidOperationException("Ocupado.");
         }
@@ -60,7 +57,8 @@ internal sealed class PlacaFalsa(string id) : IPlaca
             identificador,
             EstadosTrabalho.Executando,
             perfil.Nivel,
-            nucleo % 2,
+            vaga % 2,
+            vaga,
             0,
             16,
             16,
@@ -71,11 +69,9 @@ internal sealed class PlacaFalsa(string id) : IPlaca
             solicitacao.Linha,
             solicitacao.LarguraImagem,
             solicitacao.AlturaImagem,
-            solicitacao.Tipo,
-            solicitacao.DuracaoSegundos,
-            nucleo);
+            solicitacao.DuracaoSegundos);
 
-        Resultados[nucleo] = resultado;
+        Resultados[vaga] = resultado;
         if (PerderAceitacao)
         {
             throw new IOException("Resposta perdida.");
@@ -90,34 +86,32 @@ internal sealed class PlacaFalsa(string id) : IPlaca
         return Task.FromResult(Resultados.Values.Single(resultado => resultado.Id == identificador));
     }
 
-    public Task<byte[]> ObterImagem(string identificador, int tamanho, CancellationToken cancelamento)
-    {
-        if (FalharImagem)
-        {
-            throw new IOException("Transferência interrompida.");
-        }
-
-        byte cor = CorPorPassagem
-            ? (byte)((Resultados.Values.Single(resultado => resultado.Id == identificador).Passagem + 1) * 40)
-            : (byte)0;
-
-        return Task.FromResult(Enumerable.Repeat(cor, tamanho).ToArray());
-    }
-
     public Task Cancelar(string identificador, CancellationToken cancelamento)
     {
         Verificar();
-        foreach (var (nucleo, resultado) in Resultados.ToArray())
+        foreach (var (vaga, resultado) in Resultados.ToArray())
         {
             if (resultado.Id == identificador && !IgnorarCancelamento)
             {
-                Resultados[nucleo] = resultado with { Estado = EstadosTrabalho.Cancelado };
+                Resultados[vaga] = resultado with { Estado = EstadosTrabalho.Cancelado };
             }
         }
 
         return Task.CompletedTask;
     }
 
-    public void Concluir(int nucleo) =>
-        Resultados[nucleo] = Resultados[nucleo] with { Estado = EstadosTrabalho.Concluido, Progresso = 100, TempoMs = 100 };
+    public Task<PublicacaoBloco?> ConsultarBloco(string identificador, CancellationToken cancelamento)
+    {
+        Verificar();
+        return Task.FromResult<PublicacaoBloco?>(null);
+    }
+
+    public Task AvancarBloco(string identificador, int publicacao, BlocoImagem bloco, CancellationToken cancelamento)
+    {
+        Verificar();
+        return Task.CompletedTask;
+    }
+
+    public void Concluir(int vaga) =>
+        Resultados[vaga] = Resultados[vaga] with { Estado = EstadosTrabalho.Concluido, Progresso = 100, TempoMs = 100 };
 }

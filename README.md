@@ -121,7 +121,7 @@ Tarefas interrompidas por retirada ou falha voltam para a fila com o **mesmo nú
 
 ## 4. API principal
 
-- `GET /api/info`: modo ativo, versão do protocolo, identificação do painel (`"simples"`), `imagemProgressiva` e duração das tarefas (`20` s).
+- `GET /api/info`: modo ativo, duração das tarefas (`20` s) e perfis disponíveis (`leve`, `medio`, `pesado`).
 - `POST /api/tasks`: JSON `{"nivel":"leve"}` (`leve`, `medio` ou `pesado`); retorna `202` com `numero`. Destino e duração são definidos no servidor.
 - `GET /api/painel/state`: estado resumido com placas, fila, última decisão, situação, aviso e progresso da imagem.
 - `GET /api/painel/events`: envia o mesmo estado via SSE (1 vez por segundo).
@@ -155,17 +155,22 @@ $id = [guid]::NewGuid().ToString('N')
 Invoke-RestMethod "$placa/health" | ConvertTo-Json -Depth 6
 
 Invoke-RestMethod "$placa/jobs" -Method Post -Body @{
-    id=$id; nivel='leve'; vaga=0; quadro=0; passagem=0; coluna=32; linha=48
-    larguraImagem=256; alturaImagem=192; tipo='bloco'; duracaoSegundos=0
+    id=$id; nivel='leve'; vaga=0; quadro=0; passagem=0; coluna=0; linha=0
+    larguraImagem=512; alturaImagem=384; duracaoSegundos=20
 }
 
 Invoke-RestMethod "$placa/jobs?id=$id"
 
-# Após concluir um trabalho do tipo 'bloco':
-Invoke-WebRequest "$placa/jobs/$id/image" -OutFile bloco.rgb
+# Consultar bloco publicado durante a execução:
+Invoke-RestMethod "$placa/jobs/$id/tile"
+
+# Confirmar bloco recebido e indicar o próximo:
+Invoke-RestMethod "$placa/jobs/$id/next" -Method Post -Body @{
+    publicacao=0; quadro=0; passagem=0; coluna=16; linha=0
+}
 
 # Para cancelar durante a execução:
 Invoke-RestMethod "$placa/cancel" -Method Post -Body @{ id=$id }
 ```
 
-O arquivo `bloco.rgb` contém 768 bytes RGB sem cabeçalho. Para testar uma carga contínua, envie `tipo='carga'` e `duracaoSegundos=30` (consulte blocos intermediários com `GET /jobs/{id}/tile` e confirme/avance com `POST /jobs/{id}/next`).
+Os pixels publicados em `GET /jobs/{id}/tile` possuem 768 bytes RGB (16 × 16 × 3) codificados em Base64.

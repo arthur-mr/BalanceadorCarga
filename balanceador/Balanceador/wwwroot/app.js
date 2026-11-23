@@ -11,6 +11,7 @@ let sessaoDesenhada = '';
 let revisaoDesenhada = -1;
 let carregandoImagem = false;
 const sessoesAnteriores = new Set();
+const botoesParticipacao = new Map();
 
 function criarElemento(tipo, texto, classe) {
   const novo = document.createElement(tipo);
@@ -85,6 +86,36 @@ function renderizarTarefa(tarefa, emExecucao) {
   return item;
 }
 
+function obterBotaoParticipacao(placa) {
+  let participar = botoesParticipacao.get(placa.id);
+  if (!participar) {
+    participar = criarElemento('button', undefined, 'secundario');
+    botoesParticipacao.set(placa.id, participar);
+  }
+
+  const acao = placa.habilitada ? 'Retirar' : 'Reincluir';
+  participar.textContent = `${acao} placa`;
+  participar.setAttribute('aria-label', `${acao} ${placa.nome}`);
+  participar.onclick = async () => {
+    participar.disabled = true;
+    try {
+      await requisitar(
+        `/api/boards/${encodeURIComponent(placa.id)}/participation`,
+        'PUT',
+        { habilitada: !placa.habilitada }
+      );
+      renderizar(await requisitar('/api/painel/state'));
+      elemento('mensagem').hidden = true;
+    } catch (erro) {
+      informar(erro.message);
+    } finally {
+      participar.disabled = false;
+    }
+  };
+
+  return participar;
+}
+
 function renderizarPlaca(placa) {
   const cartao = criarElemento('article', undefined, 'placa');
 
@@ -117,33 +148,10 @@ function renderizarPlaca(placa) {
   cartao.append(tarefas);
 
   if (placa.erro) {
-    const mensagem = placa.erro.includes('Protocolo incompatível')
-      ? 'Atualize o firmware da placa para a versão 5.'
-      : 'Aguardando comunicação com a placa.';
-    cartao.append(criarElemento('p', mensagem, 'erro'));
+    cartao.append(criarElemento('p', 'Aguardando comunicação com a placa.', 'erro'));
   }
 
-  const acao = placa.habilitada ? 'Retirar' : 'Reincluir';
-  const participar = criarElemento('button', `${acao} placa`, 'secundario');
-  participar.setAttribute('aria-label', `${acao} ${placa.nome}`);
-  participar.onclick = async () => {
-    participar.disabled = true;
-    try {
-      await requisitar(
-        `/api/boards/${encodeURIComponent(placa.id)}/participation`,
-        'PUT',
-        { habilitada: !placa.habilitada }
-      );
-      renderizar(await requisitar('/api/painel/state'));
-      elemento('mensagem').hidden = true;
-    } catch (erro) {
-      informar(erro.message);
-    } finally {
-      participar.disabled = false;
-    }
-  };
-  cartao.append(participar);
-
+  cartao.append(obterBotaoParticipacao(placa));
   return cartao;
 }
 
@@ -289,9 +297,6 @@ elemento('resetar-imagem').onclick = async () => {
 (async function iniciar() {
   try {
     const informacoes = await requisitar('/api/info');
-    if (informacoes.protocolo !== 5 || informacoes.painel !== 'simples' || !informacoes.imagemProgressiva) {
-      throw Error('Reinicie o balanceador atualizado para abrir o painel simples.');
-    }
 
     if (Number.isFinite(informacoes.duracaoSegundos) && informacoes.duracaoSegundos > 0) {
       duracaoTarefaSegundos = informacoes.duracaoSegundos;

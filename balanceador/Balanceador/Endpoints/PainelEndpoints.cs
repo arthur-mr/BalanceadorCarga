@@ -12,9 +12,6 @@ public static class PainelEndpoints
         aplicacao.MapGet("/api/info", () => new
         {
             modo,
-            protocolo = 5,
-            painel = "simples",
-            imagemProgressiva = true,
             duracaoSegundos = BalanceadorDeCarga.DuracaoTarefaSegundos,
             perfis = PerfilRenderizacao.Todos
         });

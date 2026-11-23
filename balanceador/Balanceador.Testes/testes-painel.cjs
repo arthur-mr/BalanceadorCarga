@@ -20,7 +20,7 @@ function lerTexto(elemento) {
   return (elemento.textContent || '') + ' ' + elemento.children.map(lerTexto).join(' ');
 }
 
-async function criarPainel({ painelSimples = true, falharEnvio = false, atrasarImagens = false } = {}) {
+async function criarPainel({ falharEnvio = false, atrasarImagens = false } = {}) {
   const elementos = new Map();
   const requisicoes = [];
   const desenhos = [], imagensPendentes = [];
@@ -58,7 +58,7 @@ async function criarPainel({ painelSimples = true, falharEnvio = false, atrasarI
     async fetch(endereco, opcoes) {
       requisicoes.push({ endereco, opcoes });
       if (endereco === '/api/info') return responder({
-        modo: 'Simulator', protocolo: 5, imagemProgressiva: true, painel: painelSimples ? 'simples' : undefined, duracaoSegundos: 20
+        modo: 'Simulator', duracaoSegundos: 20
       });
       if (endereco === '/api/painel/state') return responder(estado);
       if (endereco === '/api/painel/imagem/reset') {
@@ -130,15 +130,18 @@ teste('cartoes mostram CPU e tarefas por nivel com tempo restante aproximado', a
   verificar.match(texto, /~10 s/);
 });
 
-teste('retirar e reincluir usa somente o controle de participacao', async () => {
+teste('retirar e reincluir preserva a mesma instancia do botao de participacao', async () => {
   const painel = await criarPainel();
-  let botao = painel.elementos.get('placas').children[0].children.find(filho => filho.tipo === 'button');
-  await botao.onclick();
+  const botaoInicial = painel.elementos.get('placas').children[0].children.find(filho => filho.tipo === 'button');
+  await botaoInicial.onclick();
   verificar.deepEqual(JSON.parse(painel.requisicoes.find(requisicao => requisicao.endereco === '/api/boards/A/participation').opcoes.body), { habilitada: false });
-  botao = painel.elementos.get('placas').children[0].children.find(filho => filho.tipo === 'button');
-  verificar.equal(botao.textContent, 'Reincluir placa');
-  await botao.onclick();
-  verificar.equal(painel.elementos.get('placas').children[0].children.find(filho => filho.tipo === 'button').textContent, 'Retirar placa');
+  const botaoAposRetirar = painel.elementos.get('placas').children[0].children.find(filho => filho.tipo === 'button');
+  verificar.equal(botaoAposRetirar, botaoInicial);
+  verificar.equal(botaoAposRetirar.textContent, 'Reincluir placa');
+  await botaoAposRetirar.onclick();
+  const botaoAposReincluir = painel.elementos.get('placas').children[0].children.find(filho => filho.tipo === 'button');
+  verificar.equal(botaoAposReincluir, botaoInicial);
+  verificar.equal(botaoAposReincluir.textContent, 'Retirar placa');
 });
 
 teste('ultima decisao usa a explicacao do envio e nao compara a CPU atual novamente', async () => {
@@ -160,12 +163,6 @@ teste('CPU indisponivel nao e apresentada como zero', async () => {
   verificar.match(texto, /Sem conex/);
   verificar.match(texto, /—/);
   verificar.doesNotMatch(texto, /0%/);
-});
-
-teste('servidor antigo pede reinicio e bloqueia os tres botoes', async () => {
-  const painel = await criarPainel({ painelSimples: false });
-  verificar.match(painel.elementos.get('mensagem').textContent, /Reinicie o balanceador/);
-  for (const nivel of ['leve', 'medio', 'pesado']) verificar.equal(painel.elementos.get(`adicionar-${nivel}`).disabled, true);
 });
 
 teste('erro ao adicionar tarefa e exibido sem deixar o botao bloqueado', async () => {

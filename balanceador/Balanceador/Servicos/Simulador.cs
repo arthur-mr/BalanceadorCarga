@@ -17,7 +17,6 @@ public sealed class Simulador(string id)
     {
         public ResultadoTrabalho? Resultado { get; set; }
         public SolicitacaoTrabalho? Solicitacao { get; set; }
-        public byte[]? Imagem { get; set; }
         public CancellationTokenSource? Cancelamento { get; set; }
         public SolicitacaoTrabalho? BlocoAtual { get; set; }
         public PublicacaoBloco? Publicacao { get; set; }
@@ -72,17 +71,16 @@ public sealed class Simulador(string id)
                 .ToArray();
 
             return new(
-                5,
                 id,
                 nucleos.Average(nucleo => nucleo.Cpu),
                 true,
                 0,
                 nucleos,
+                estadosVagas,
                 concluidos,
                 tempoLigado.ElapsedMilliseconds,
                 MemoriaLivreSimulada,
-                RssiSimulado,
-                estadosVagas);
+                RssiSimulado);
         }
     }
 
@@ -116,7 +114,6 @@ public sealed class Simulador(string id)
 
             vaga.Cancelamento?.Dispose();
             vaga.Cancelamento = new(TimeSpan.FromSeconds(TimeoutExecucaoSegundos));
-            vaga.Imagem = null;
             vaga.Solicitacao = solicitacao;
             vaga.BlocoAtual = solicitacao;
             vaga.Publicacao = null;
@@ -126,6 +123,7 @@ public sealed class Simulador(string id)
                 EstadosTrabalho.Executando,
                 solicitacao.Nivel,
                 indiceVaga % QuantidadeNucleos,
+                indiceVaga,
                 0,
                 SolicitacaoTrabalho.TamanhoBloco,
                 SolicitacaoTrabalho.TamanhoBloco,
@@ -136,9 +134,7 @@ public sealed class Simulador(string id)
                 solicitacao.Linha,
                 solicitacao.LarguraImagem,
                 solicitacao.AlturaImagem,
-                solicitacao.Tipo,
-                solicitacao.DuracaoSegundos,
-                indiceVaga);
+                solicitacao.DuracaoSegundos);
 
             int atraso = atrasoMs;
             CancellationToken cancelamento = vaga.Cancelamento.Token;
@@ -153,15 +149,6 @@ public sealed class Simulador(string id)
         {
             VerificarOnline();
             return Localizar(identificador).Resultado!;
-        }
-    }
-
-    public byte[] ObterImagem(string identificador)
-    {
-        lock (trava)
-        {
-            VerificarOnline();
-            return Localizar(identificador).Imagem ?? throw new InvalidOperationException("Imagem indisponível.");
         }
     }
 
@@ -195,7 +182,7 @@ public sealed class Simulador(string id)
                 return;
             }
 
-            if (!EstaOcupada(vaga) || vaga.Solicitacao!.Tipo != "carga" || vaga.Sequencia != publicacao || vaga.Publicacao is null)
+            if (!EstaOcupada(vaga) || vaga.Sequencia != publicacao || vaga.Publicacao is null)
             {
                 throw new InvalidOperationException("Publicação já substituída ou tarefa encerrada.");
             }
@@ -255,14 +242,13 @@ public sealed class Simulador(string id)
     private async Task Executar(Vaga vaga, SolicitacaoTrabalho solicitacao, int atraso, CancellationToken cancelamento)
     {
         var relogio = Stopwatch.StartNew();
-        byte[]? imagem = null;
         string estado = EstadosTrabalho.Concluido;
 
         try
         {
             await Task.Delay(atraso, cancelamento);
 
-            var tempoCarga = Stopwatch.StartNew();
+            var tempoExecucao = Stopwatch.StartNew();
             var controle = new ControleIntensidade(PerfilRenderizacao.Obter(solicitacao.Nivel).Intensidade);
 
             do
@@ -276,15 +262,15 @@ public sealed class Simulador(string id)
                     sequencia = vaga.Sequencia;
                 }
 
-                imagem = await RenderizadorCena.Renderizar(
+                byte[] imagem = await RenderizadorCena.Renderizar(
                     atual,
-                    progressoBloco => AtualizarProgresso(vaga, solicitacao, progressoBloco, tempoCarga, relogio),
+                    _ => AtualizarProgresso(vaga, solicitacao, tempoExecucao, relogio),
                     cancelamento,
                     controle);
 
-                PublicarBlocoSeNecessario(vaga, solicitacao, atual, sequencia, imagem);
+                PublicarBlocoSeNecessario(vaga, atual, sequencia, imagem);
             }
-            while (solicitacao.Tipo == "carga" && tempoCarga.Elapsed.TotalSeconds < solicitacao.DuracaoSegundos);
+            while (tempoExecucao.Elapsed.TotalSeconds < solicitacao.DuracaoSegundos);
 
             cancelamento.ThrowIfCancellationRequested();
         }
@@ -299,7 +285,6 @@ public sealed class Simulador(string id)
 
         lock (trava)
         {
-            vaga.Imagem = estado == EstadosTrabalho.Concluido && solicitacao.Tipo == "bloco" ? imagem : null;
             vaga.Resultado = vaga.Resultado! with
             {
                 Estado = estado,
@@ -317,13 +302,10 @@ public sealed class Simulador(string id)
     private void AtualizarProgresso(
         Vaga vaga,
         SolicitacaoTrabalho solicitacao,
-        double progressoBloco,
-        Stopwatch tempoCarga,
+        Stopwatch tempoExecucao,
         Stopwatch relogio)
     {
-        double progresso = solicitacao.Tipo == "carga"
-            ? Math.Min(99.9, 100.0 * tempoCarga.Elapsed.TotalSeconds / solicitacao.DuracaoSegundos)
-            : progressoBloco;
+        double progresso = Math.Min(99.9, 100.0 * tempoExecucao.Elapsed.TotalSeconds / solicitacao.DuracaoSegundos);
 
         lock (trava)
         {
@@ -337,14 +319,13 @@ public sealed class Simulador(string id)
 
     private void PublicarBlocoSeNecessario(
         Vaga vaga,
-        SolicitacaoTrabalho solicitacao,
         SolicitacaoTrabalho blocoCalculado,
         int sequenciaOriginal,
         byte[] imagem)
     {
         lock (trava)
         {
-            if (solicitacao.Tipo == "carga" && vaga.Sequencia == sequenciaOriginal && vaga.Publicacao is null)
+            if (vaga.Sequencia == sequenciaOriginal && vaga.Publicacao is null)
             {
                 vaga.Publicacao = new(
                     sequenciaOriginal,

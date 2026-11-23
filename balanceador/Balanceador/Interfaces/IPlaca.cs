@@ -8,8 +8,7 @@ public interface IPlaca
     Task<SaudePlaca> ConsultarSaude(CancellationToken cancelamento);
     Task<ResultadoTrabalho> Enviar(string id, SolicitacaoTrabalho solicitacao, int vaga, CancellationToken cancelamento);
     Task<ResultadoTrabalho> ConsultarTrabalho(string id, CancellationToken cancelamento);
-    Task<byte[]> ObterImagem(string id, int tamanho, CancellationToken cancelamento);
     Task Cancelar(string id, CancellationToken cancelamento);
-    Task<PublicacaoBloco?> ConsultarBloco(string id, CancellationToken cancelamento) => Task.FromResult<PublicacaoBloco?>(null);
-    Task AvancarBloco(string id, int publicacao, BlocoImagem bloco, CancellationToken cancelamento) => Task.CompletedTask;
+    Task<PublicacaoBloco?> ConsultarBloco(string id, CancellationToken cancelamento);
+    Task AvancarBloco(string id, int publicacao, BlocoImagem bloco, CancellationToken cancelamento);
 }

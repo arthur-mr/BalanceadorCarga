@@ -101,7 +101,7 @@ public class TestesImagemProgressiva
         placa.ConfigurarFalha(false, 0);
         string id = Guid.NewGuid().ToString("N");
         var solicitacao = new SolicitacaoTrabalho("leve", Coluna: 240, Linha: 176,
-            LarguraImagem: 512, AlturaImagem: 384, Tipo: "carga", DuracaoSegundos: 3);
+            LarguraImagem: 512, AlturaImagem: 384, DuracaoSegundos: 3);
         placa.Enviar(id, solicitacao, 0);
         try
         {

@@ -5,6 +5,7 @@ public sealed record ResultadoTrabalho(
     string Estado,
     string Nivel,
     int Nucleo,
+    int Vaga,
     double Progresso,
     int Largura,
     int Altura,
@@ -13,8 +14,6 @@ public sealed record ResultadoTrabalho(
     int Passagem = 0,
     int Coluna = 0,
     int Linha = 0,
-    int LarguraImagem = 128,
-    int AlturaImagem = 96,
-    string Tipo = "bloco",
-    int DuracaoSegundos = 0,
-    int? Vaga = null);
+    int LarguraImagem = 512,
+    int AlturaImagem = 384,
+    int DuracaoSegundos = 20);

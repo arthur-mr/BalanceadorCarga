@@ -38,7 +38,6 @@ public static class SimuladorEndpoints
                 LerNumeroFormulario(formulario, "linha"),
                 LerNumeroFormulario(formulario, "larguraImagem"),
                 LerNumeroFormulario(formulario, "alturaImagem"),
-                formulario["tipo"].ToString(),
                 LerNumeroFormulario(formulario, "duracaoSegundos"));
 
             ResultadoTrabalho resultado = ObterSimulador(indice).Enviar(formulario["id"].ToString(), solicitacao, vaga);
@@ -47,9 +46,6 @@ public static class SimuladorEndpoints
 
         aplicacao.MapGet("/sim/{indice:int}/jobs", (int indice, string id) =>
             ObterSimulador(indice).ConsultarTrabalho(id));
-
-        aplicacao.MapGet("/sim/{indice:int}/jobs/{id}/image", (int indice, string id) =>
-            Results.Bytes(ObterSimulador(indice).ObterImagem(id), "application/octet-stream"));
 
         aplicacao.MapGet("/sim/{indice:int}/jobs/{id}/tile", (int indice, string id) =>
         {

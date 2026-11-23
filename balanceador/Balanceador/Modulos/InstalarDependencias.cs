@@ -23,8 +23,8 @@ public static class InstalarDependencias
         }
 
         PlacaHttp[] placas = CriarPlacas(configuracao, modo, simuladores.Length);
-        var balanceador = new BalanceadorDeCarga(placas);
-        balanceador.Configurar(false, configuracao.GetValue("Balancer:JobTimeoutSeconds", 120), 4, 1000);
+        int intervaloAtribuicaoMs = configuracao.GetValue("Balancer:IntervaloAtribuicaoMs", 1000);
+        var balanceador = new BalanceadorDeCarga(placas, intervaloAtribuicaoMs: intervaloAtribuicaoMs);
 
         servicos.AddSingleton(balanceador);
         servicos.AddHostedService<TrabalhadorBalanceamento>();
